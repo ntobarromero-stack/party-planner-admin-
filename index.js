@@ -1,6 +1,6 @@
 // === Constants ===
 const BASE = "https://fsa-crud-2aa9294fe819.herokuapp.com/api";
-const COHORT = ""; // Make sure to change this!
+const COHORT = "/2602-FTB-CT-WEB-PT";
 const API = BASE + COHORT;
 
 // === State ===
@@ -57,7 +57,68 @@ async function getGuests() {
   }
 }
 
+/** Creates a new party via POST request */
+async function createParty(formData) {
+  try {
+    const response = await fetch(API + "/events", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(formData),
+    });
+    const result = await response.json();
+    parties.push(result.data);
+    render();
+  } catch (e) {
+    console.error("Error creating party:", e);
+  }
+}
+
+/** Deletes a party via DELETE request */
+async function deleteParty(id) {
+  try {
+    await fetch(API + "/events/" + id, {
+      method: "DELETE",
+    });
+    parties = parties.filter((party) => party.id !== id);
+    selectedParty = null;
+    render();
+  } catch (e) {
+    console.error("Error deleting party:", e);
+  }
+}
+
 // === Components ===
+
+/** Form to create a new party */
+function CreatePartyForm() {
+  const $form = document.createElement("form");
+  $form.classList.add("create-form");
+  $form.innerHTML = `
+    <h3>Add a new party</h3>
+    <input type="text" name="name" placeholder="Name" required />
+    <textarea name="description" placeholder="Description" required></textarea>
+    <input type="datetime-local" name="date" required />
+    <input type="text" name="location" placeholder="Location" required />
+    <button type="submit">Add party</button>
+  `;
+
+  $form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    const formData = new FormData($form);
+    const partyData = {
+      name: formData.get("name"),
+      description: formData.get("description"),
+      date: formData.get("date"),
+      location: formData.get("location"),
+    };
+    createParty(partyData);
+    $form.reset();
+  });
+
+  return $form;
+}
 
 /** Party name that shows more details about the party when clicked */
 function PartyListItem(party) {
@@ -101,11 +162,23 @@ function SelectedParty() {
     </time>
     <address>${selectedParty.location}</address>
     <p>${selectedParty.description}</p>
+    <h4>Guests</h4>
     <GuestList></GuestList>
+    <DeleteButton></DeleteButton>
   `;
   $party.querySelector("GuestList").replaceWith(GuestList());
+  $party.querySelector("DeleteButton").replaceWith(DeleteButton());
 
   return $party;
+}
+
+/** Delete button for the selected party */
+function DeleteButton() {
+  const $button = document.createElement("button");
+  $button.classList.add("delete-btn");
+  $button.textContent = "Delete party";
+  $button.addEventListener("click", () => deleteParty(selectedParty.id));
+  return $button;
 }
 
 /** List of guests attending the selected party */
@@ -113,17 +186,22 @@ function GuestList() {
   const $ul = document.createElement("ul");
   const guestsAtParty = guests.filter((guest) =>
     rsvps.find(
-      (rsvp) => rsvp.guestId === guest.id && rsvp.eventId === selectedParty.id
-    )
+      (rsvp) => rsvp.guestId === guest.id && rsvp.eventId === selectedParty.id,
+    ),
   );
 
-  // Simple components can also be created anonymously:
-  const $guests = guestsAtParty.map((guest) => {
-    const $guest = document.createElement("li");
-    $guest.textContent = guest.name;
-    return $guest;
-  });
-  $ul.replaceChildren(...$guests);
+  if (guestsAtParty.length === 0) {
+    const $li = document.createElement("li");
+    $li.textContent = "No RSVPs yet.";
+    $ul.appendChild($li);
+  } else {
+    const $guests = guestsAtParty.map((guest) => {
+      const $guest = document.createElement("li");
+      $guest.textContent = guest.name;
+      return $guest;
+    });
+    $ul.replaceChildren(...$guests);
+  }
 
   return $ul;
 }
@@ -137,6 +215,7 @@ function render() {
       <section>
         <h2>Upcoming Parties</h2>
         <PartyList></PartyList>
+        <CreatePartyForm></CreatePartyForm>
       </section>
       <section id="selected">
         <h2>Party Details</h2>
@@ -146,6 +225,7 @@ function render() {
   `;
 
   $app.querySelector("PartyList").replaceWith(PartyList());
+  $app.querySelector("CreatePartyForm").replaceWith(CreatePartyForm());
   $app.querySelector("SelectedParty").replaceWith(SelectedParty());
 }
 
